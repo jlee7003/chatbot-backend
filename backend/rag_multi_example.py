@@ -24,7 +24,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://chatbot-backend-stbs.onrender.com"],
+    allow_origins=["https://chatbot-frontend-plum-five.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

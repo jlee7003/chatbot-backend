@@ -19,7 +19,7 @@ app = FastAPI()
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://chatbot-backend-stbs.onrender.com"],
+    allow_origins=["https://chatbot-frontend-plum-five.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
