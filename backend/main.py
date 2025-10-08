@@ -10,6 +10,7 @@ import glob
 from pptx import Presentation
 from pypdf import PdfReader
 from docx import Document
+from threading import Thread
 
 # 환경 변수 로드
 load_dotenv()
@@ -69,7 +70,7 @@ def get_embedding(text):
     return response.data[0].embedding
 
 # -------------------------------
-# 🗄️ 4. 문서 폴더에서 자동 로드 & 벡터화
+# 🗄️ 4. 문서 로드 & 벡터화
 # -------------------------------
 def load_all_documents(folder_path="documents"):
     chunks = []
@@ -91,12 +92,23 @@ def load_all_documents(folder_path="documents"):
 
     return chunks
 
-# 문서 로드 & 벡터화
-print("📂 문서 로딩 시작...")
-chunks = load_all_documents("documents")  # documents 폴더
-embeddings = [get_embedding(chunk) for chunk in chunks]
-embeddings = np.array(embeddings)
-print(f"✅ 문서 로드 완료! 총 {len(chunks)}개 청크 벡터화")
+# -------------------------------
+# 서버 초기화 플래그 & 전역 변수
+# -------------------------------
+chunks = []
+embeddings = np.array([])
+is_ready = False
+
+def initialize_embeddings():
+    global chunks, embeddings, is_ready
+    print("📂 문서 로딩 및 벡터화 시작...")
+    chunks = load_all_documents("documents")
+    embeddings = np.array([get_embedding(c) for c in chunks])
+    is_ready = True
+    print(f"✅ 문서 로드 완료! 총 {len(chunks)}개 청크 벡터화")
+
+# 백그라운드 스레드로 초기화
+Thread(target=initialize_embeddings).start()
 
 # -------------------------------
 # 🔍 5. 검색 함수 (코사인 유사도)
@@ -114,6 +126,10 @@ def search(query, top_k=3):
 # -------------------------------
 @app.post("/chat")
 async def chat(user_input: dict):
+    global is_ready
+    if not is_ready:
+        return {"reply": "⚠️ 서버가 문서를 벡터화하는 중입니다. 잠시 후 다시 시도해주세요.", "context": []}
+
     query = user_input.get("message", "")
     if not query.strip():
         return {"reply": "질문을 입력해주세요.", "context": []}
@@ -131,9 +147,14 @@ async def chat(user_input: dict):
     )
 
     answer = response.choices[0].message.content
-    return {"reply": answer, "context": context}  # GPT 답변 + 참고 문서 청크
+    return {"reply": answer, "context": context}
 
+# -------------------------------
 # 루트 테스트
+# -------------------------------
 @app.get("/")
 def root():
-    return {"message": "FastAPI RAG 서버 정상 실행 🚀"}
+    status_msg = "✅ 서버 실행 중"
+    if not is_ready:
+        status_msg = "⚠️ 문서 벡터화 진행 중"
+    return {"message": f"FastAPI RAG 서버 정상 실행 🚀 - {status_msg}"}
